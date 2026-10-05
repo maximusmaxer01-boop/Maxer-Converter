@@ -1,0 +1,40 @@
+{
+  "name": "maxer-converter",
+  "version": "1.0.0",
+  "description": "Conversor de video a audio by Maxer Dev",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.maxerdev.converter",
+    "productName": "Maxer Converter",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "src/icon_converter.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Maxer Converter"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "allowScripts": {
+    "electron@28.3.3": true
+  }
+}

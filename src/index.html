@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Maxer Converter</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f17; --surface: #1a1a2e; --surface2: #16213e;
+    --border: #2d2d4e; --accent: #e94560; --green: #22c55e;
+    --cyan: #00d4ff; --text: #eaeaea; --muted: #8888aa; --radius: 10px;
+  }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 13px; overflow-y: auto; }
+  .header { background: linear-gradient(135deg, #0f3460, #e94560); padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 16px; font-weight: 700; color: #fff; }
+  .header p { font-size: 11px; color: rgba(255,255,255,0.7); }
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .page { display: none; padding: 14px; flex-direction: column; gap: 10px; }
+  .page.active { display: flex; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .card-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface2); }
+  .dropzone:hover { border-color: var(--accent); }
+  .dropzone-icon { font-size: 32px; margin-bottom: 6px; }
+  .dropzone-text { color: var(--muted); font-size: 13px; }
+  .dropzone-text b { color: var(--accent); }
+  .file-info { margin-top: 8px; font-size: 12px; color: var(--green); display: none; }
+  .format-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .fmt-btn { padding: 10px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .fmt-btn:hover { border-color: var(--accent); color: var(--text); }
+  .fmt-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .trim-row { display: flex; gap: 12px; align-items: flex-end; }
+  .trim-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .trim-field label { font-size: 11px; color: var(--muted); }
+  .trim-field input { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; outline: none; }
+  .trim-field input:focus { border-color: var(--accent); }
+  .vol-row { display: flex; align-items: center; gap: 12px; }
+  .vol-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .vol-val { min-width: 40px; text-align: right; font-weight: 600; color: var(--accent); }
+  .output-row { display: flex; gap: 8px; }
+  .output-row input { flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; outline: none; }
+  .btn-sm { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; font-size: 13px; }
+  .btn-sm:hover { border-color: var(--accent); color: var(--text); }
+  .btn-convert { width: 100%; padding: 14px; border-radius: var(--radius); border: none; background: linear-gradient(135deg, var(--accent), #c0392b); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
+  .btn-convert:hover { opacity: 0.9; }
+  .btn-convert:disabled { opacity: 0.4; cursor: not-allowed; }
+  .progress-wrap { display: none; }
+  .progress-bar-bg { background: var(--surface2); border-radius: 20px; height: 8px; overflow: hidden; margin: 8px 0; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), #ff6b6b); border-radius: 20px; width: 0%; transition: width 0.3s; }
+  .progress-text { font-size: 12px; color: var(--muted); text-align: center; }
+  .status { text-align: center; font-size: 13px; padding: 6px; border-radius: 6px; display: none; }
+  .status.ok { background: #0a2e1a; color: var(--green); }
+  .status.err { background: #2e0a0a; color: #ff6b6b; }
+
+  /* EDITOR */
+  .waveform-container { position: relative; background: #0a0a1a; border-radius: 8px; overflow: hidden; height: 160px; cursor: crosshair; }
+  #waveCanvas { width: 100%; height: 100%; display: block; }
+  .time-ruler { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); padding: 2px 0; }
+  .playback-controls { display: flex; align-items: center; gap: 10px; justify-content: center; }
+  .play-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--cyan); border: none; color: #000; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .time-display { font-size: 13px; color: var(--cyan); font-family: monospace; min-width: 100px; text-align: center; }
+  .skip-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; font-size: 12px; }
+  .trim-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .trim-ctrl { display: flex; flex-direction: column; gap: 6px; }
+  .trim-ctrl label { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .trim-ctrl-row { display: flex; align-items: center; gap: 6px; }
+  .trim-num { flex: 1; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; outline: none; text-align: center; }
+  .trim-adj { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 16px; cursor: pointer; font-weight: 700; }
+  .trim-adj:hover { background: var(--accent); border-color: var(--accent); }
+  .no-file-msg { text-align: center; padding: 40px; color: var(--muted); }
+  .no-file-msg div { font-size: 32px; margin-bottom: 8px; }
+  .video-preview { width: 100%; border-radius: 8px; background: #000; max-height: 160px; object-fit: contain; display: none; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🎵 Maxer Converter</h1>
+    <p>Convierte y edita audio — by Maxer Dev</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" id="tab-btn-convert" onclick="showTab('convert')">🎬 Convertir</div>
+  <div class="tab" id="tab-btn-editor" onclick="showTab('editor')">✂️ Editor de audio</div>
+</div>
+
+<!-- CONVERT TAB -->
+<div class="page active" id="tab-convert">
+  <div class="card">
+    <div class="card-title">📁 Archivo de video</div>
+    <div class="dropzone" id="dropzone" onclick="pickFile()">
+      <div class="dropzone-icon">🎬</div>
+      <div class="dropzone-text">Haz clic para elegir un video<br><b>MP4, MKV, AVI, MOV, WMV, FLV...</b></div>
+    </div>
+    <div class="file-info" id="fileInfo">✅ <span id="fileName"></span> — <span id="fileDur"></span></div>
+    <video id="videoPreview" class="video-preview" controls></video>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🎵 Formato de salida</div>
+    <div class="format-grid">
+      <div class="fmt-btn active" onclick="setFormat(this,'mp3')">MP3</div>
+      <div class="fmt-btn" onclick="setFormat(this,'wav')">WAV</div>
+      <div class="fmt-btn" onclick="setFormat(this,'ogg')">OGG</div>
+      <div class="fmt-btn" onclick="setFormat(this,'aac')">AAC</div>
+      <div class="fmt-btn" onclick="setFormat(this,'flac')">FLAC</div>
+    </div>
+  </div>
+
+
+
+  <div class="card">
+    <div class="card-title">🔊 Volumen</div>
+    <div class="vol-row">
+      <span style="color:var(--muted);">0%</span>
+      <input type="range" id="volume" min="0" max="2" step="0.05" value="1" oninput="updateVol()"/>
+      <span style="color:var(--muted);">200%</span>
+      <div class="vol-val" id="volVal">100%</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💾 Carpeta de salida</div>
+    <div class="output-row">
+      <input type="text" id="outputFolder" placeholder="Selecciona una carpeta..." readonly/>
+      <button class="btn-sm" onclick="pickFolder()">📂 Elegir</button>
+    </div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">Convirtiendo...</div>
+  </div>
+  <input type="hidden" id="startTime" value="0"/>
+  <input type="hidden" id="endTime" value=""/>
+  <div class="status" id="status"></div>
+  <button class="btn-convert" id="btnConvert" onclick="convert()">🎵 Convertir</button>
+</div>
+
+<!-- EDITOR TAB -->
+<div class="page" id="tab-editor">
+  <div id="noFileMsg" class="card no-file-msg">
+    <div>🎬</div>
+    <p>Primero selecciona un archivo en la pestaña <b>Convertir</b></p>
+  </div>
+
+  <div id="editorContent" style="display:none; flex-direction:column; gap:10px;">
+    <div class="card">
+      <div class="card-title">🌊 Forma de onda</div>
+      <div class="waveform-container" id="waveContainer">
+        <canvas id="waveCanvas"></canvas>
+      </div>
+      <div class="time-ruler" id="timeRuler"></div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;">Haz clic en la onda para mover el cursor</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">▶ Reproducción</div>
+      <div class="playback-controls">
+        <button class="skip-btn" onclick="skipTime(-5)">⏮ 5s</button>
+        <button class="play-btn" id="playBtn" onclick="togglePlay()">▶</button>
+        <button class="skip-btn" onclick="skipTime(5)">5s ⏭</button>
+        <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
+      </div>
+      <div style="margin-top:10px;">
+        <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" style="width:100%;accent-color:var(--cyan);" oninput="seekAudio()"/>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✂️ Puntos de corte</div>
+      <div class="trim-controls">
+        <div class="trim-ctrl">
+          <label>🟢 Inicio</label>
+          <div class="trim-ctrl-row">
+            <button class="trim-adj" onclick="adjustTrim('start',-0.1)">−</button>
+            <input type="number" class="trim-num" id="edStartTime" value="0" min="0" step="0.1" oninput="syncTrimToConvert();drawWave();"/>
+            <button class="trim-adj" onclick="adjustTrim('start',0.1)">+</button>
+          </div>
+          <button class="btn-sm" style="font-size:11px;" onclick="setTrimHere('start')">📍 Marcar aquí</button>
+        </div>
+        <div class="trim-ctrl">
+          <label>🔴 Fin</label>
+          <div class="trim-ctrl-row">
+            <button class="trim-adj" onclick="adjustTrim('end',-0.1)">−</button>
+            <input type="number" class="trim-num" id="edEndTime" value="0" min="0" step="0.1" oninput="syncTrimToConvert();drawWave();"/>
+            <button class="trim-adj" onclick="adjustTrim('end',0.1)">+</button>
+          </div>
+          <button class="btn-sm" style="font-size:11px;" onclick="setTrimHere('end')">📍 Marcar aquí</button>
+        </div>
+      </div>
+      <button class="btn-convert" style="margin-top:8px;" onclick="applyAndConvert()">✂️ Aplicar corte y convertir</button>
+    </div>
+  </div>
+</div>
+
+<audio id="audioPlayer" style="display:none;"></audio>
+
+<script>
+let inputFile = null;
+let duration = 0;
+let format = 'mp3';
+let outputFolder = null;
+let waveData = [];
+let isPlaying = false;
+let currentTime = 0;
+let rafId = null;
+let trimStart = 0;
+let trimEnd = 0;
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('tab-btn-' + name).classList.add('active');
+  if (name === 'editor') initEditor();
+}
+
+function setFormat(el, fmt) {
+  document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  format = fmt;
+}
+
+function updateVol() {
+  const v = parseFloat(document.getElementById('volume').value);
+  document.getElementById('volVal').textContent = Math.round(v*100) + '%';
+}
+
+async function pickFile() {
+  const file = await window.api.openFile();
+  if (!file) return;
+  inputFile = file;
+  const name = file.split('\\').pop().split('/').pop();
+  document.getElementById('fileName').textContent = name;
+  duration = await window.api.getDuration(file);
+  document.getElementById('fileDur').textContent = formatTime(duration);
+  document.getElementById('fileInfo').style.display = 'block';
+  document.getElementById('dropzone').querySelector('.dropzone-icon').textContent = '✅';
+  outputFolder = file.substring(0, Math.max(file.lastIndexOf('\\'), file.lastIndexOf('/')));
+  document.getElementById('outputFolder').value = outputFolder;
+  trimStart = 0;
+  trimEnd = duration;
+  document.getElementById('edStartTime').value = 0;
+  document.getElementById('edEndTime').value = duration.toFixed(1);
+  generateFakeWave();
+  // Load video preview
+  const vid = document.getElementById('videoPreview');
+  vid.src = '';
+  vid.style.display = 'none';
+  setTimeout(() => {
+    vid.src = 'localvideo://' + file.replace(/\\/g, '/');
+    vid.style.display = 'block';
+  }, 100);
+}
+
+async function pickFolder() {
+  const folder = await window.api.openFolder();
+  if (!folder) return;
+  outputFolder = folder;
+  document.getElementById('outputFolder').value = folder;
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs/60);
+  const s = Math.floor(secs%60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+// Waveform (simulated since audio decode may fail)
+function generateFakeWave() {
+  waveData = [];
+  for (let i = 0; i < 300; i++) {
+    const v = 0.2 + Math.random() * 0.8;
+    waveData.push(v);
+  }
+  drawWave();
+  buildTimeRuler();
+}
+
+function drawWave() {
+  const canvas = document.getElementById('waveCanvas');
+  const container = document.getElementById('waveContainer');
+  if (!container.offsetWidth) return;
+  canvas.width = container.offsetWidth;
+  canvas.height = container.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  if (!waveData.length) return;
+  const dur = duration || 1;
+  const startPct = trimStart / dur;
+  const endPct = trimEnd / dur;
+  const curPct = currentTime / dur;
+  ctx.fillStyle = 'rgba(0,212,255,0.08)';
+  ctx.fillRect(startPct*W, 0, (endPct-startPct)*W, H);
+  const barW = W / waveData.length;
+  for (let i = 0; i < waveData.length; i++) {
+    const x = i * barW;
+    const pct = i / waveData.length;
+    const h = waveData[i] * (H * 0.85);
+    const y = (H - h) / 2;
+    ctx.fillStyle = (pct >= startPct && pct <= endPct) ? '#00d4ff' : '#1a3a5c';
+    ctx.fillRect(x + 0.5, y, Math.max(barW-1, 1), h);
+  }
+  // Start line
+  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(startPct*W, 0); ctx.lineTo(startPct*W, H); ctx.stroke();
+  ctx.fillStyle = '#22c55e'; ctx.fillRect(startPct*W, 0, 14, 14);
+  ctx.fillStyle = '#fff'; ctx.font = '9px sans-serif'; ctx.fillText('S', startPct*W+3, 11);
+  // End line
+  ctx.strokeStyle = '#ef4444';
+  ctx.beginPath(); ctx.moveTo(endPct*W, 0); ctx.lineTo(endPct*W, H); ctx.stroke();
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(endPct*W-14, 0, 14, 14);
+  ctx.fillStyle = '#fff'; ctx.fillText('E', endPct*W-11, 11);
+  // Playhead
+  if (currentTime > 0) {
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(curPct*W, 0); ctx.lineTo(curPct*W, H); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function buildTimeRuler() {
+  const ruler = document.getElementById('timeRuler');
+  ruler.innerHTML = '';
+  const steps = 8;
+  for (let i = 0; i <= steps; i++) {
+    const t = (duration / steps) * i;
+    const el = document.createElement('span');
+    el.textContent = formatTime(t);
+    ruler.appendChild(el);
+  }
+}
+
+document.getElementById('waveContainer').addEventListener('click', (e) => {
+  if (!duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  currentTime = pct * duration;
+  const audio = document.getElementById('audioPlayer');
+  if (!audio.paused) audio.currentTime = currentTime;
+  drawWave();
+  updateTimeDisplay();
+});
+
+function initEditor() {
+  if (!inputFile) {
+    document.getElementById('noFileMsg').style.display = 'block';
+    document.getElementById('editorContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('noFileMsg').style.display = 'none';
+  document.getElementById('editorContent').style.display = 'flex';
+  const audio = document.getElementById('audioPlayer');
+  if (!audio.src) {
+    audio.src = 'file:///' + inputFile.replace(/\\/g, '/');
+  }
+  drawWave();
+  buildTimeRuler();
+}
+
+function togglePlay() {
+  const audio = document.getElementById('audioPlayer');
+  if (isPlaying) {
+    audio.pause();
+    isPlaying = false;
+    document.getElementById('playBtn').textContent = '▶';
+    if (rafId) cancelAnimationFrame(rafId);
+  } else {
+    // Start from trimStart if currentTime is outside trim range
+    if (currentTime < trimStart || currentTime >= trimEnd) {
+      currentTime = trimStart;
+    }
+    audio.currentTime = currentTime;
+    audio.play();
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = '⏸';
+    updateLoop();
+  }
+}
+
+function updateLoop() {
+  if (!isPlaying) return;
+  const audio = document.getElementById('audioPlayer');
+  currentTime = audio.currentTime;
+  // Stop at trimEnd
+  if (currentTime >= trimEnd) {
+    audio.pause();
+    currentTime = trimEnd;
+    isPlaying = false;
+    document.getElementById('playBtn').textContent = '▶';
+    updateTimeDisplay();
+    drawWave();
+    return;
+  }
+  updateTimeDisplay();
+  drawWave();
+  rafId = requestAnimationFrame(updateLoop);
+}
+
+document.getElementById('audioPlayer').onended = () => {
+  isPlaying = false;
+  document.getElementById('playBtn').textContent = '▶';
+};
+
+function updateTimeDisplay() {
+  document.getElementById('seekBar').value = duration ? (currentTime/duration)*100 : 0;
+  document.getElementById('timeDisplay').textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+}
+
+function seekAudio() {
+  const pct = parseFloat(document.getElementById('seekBar').value)/100;
+  currentTime = pct * duration;
+  // Clamp to trim range
+  currentTime = Math.max(trimStart, Math.min(currentTime, trimEnd));
+  const audio = document.getElementById('audioPlayer');
+  audio.currentTime = currentTime;
+  drawWave();
+  updateTimeDisplay();
+}
+
+function skipTime(delta) {
+  currentTime = Math.max(0, Math.min(currentTime+delta, duration));
+  const audio = document.getElementById('audioPlayer');
+  audio.currentTime = currentTime;
+  updateTimeDisplay();
+  drawWave();
+}
+
+function adjustTrim(which, delta) {
+  if (which === 'start') {
+    trimStart = Math.max(0, Math.min(trimStart+delta, trimEnd-0.1));
+    document.getElementById('edStartTime').value = trimStart.toFixed(1);
+  } else {
+    trimEnd = Math.max(trimStart+0.1, Math.min(trimEnd+delta, duration));
+    document.getElementById('edEndTime').value = trimEnd.toFixed(1);
+  }
+  syncTrimToConvert(); drawWave();
+}
+
+function setTrimHere(which) {
+  if (which === 'start') {
+    trimStart = currentTime;
+    document.getElementById('edStartTime').value = trimStart.toFixed(1);
+  } else {
+    trimEnd = currentTime;
+    document.getElementById('edEndTime').value = trimEnd.toFixed(1);
+  }
+  syncTrimToConvert(); drawWave();
+}
+
+function previewTrim() {
+  const audio = document.getElementById('audioPlayer');
+  syncTrimToConvert();
+  currentTime = trimStart;
+  audio.currentTime = trimStart;
+  if (!isPlaying) {
+    audio.play();
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = '⏸';
+    updateLoop();
+  }
+}
+
+function syncTrimToConvert() {
+  trimStart = parseFloat(document.getElementById('edStartTime').value)||0;
+  trimEnd = parseFloat(document.getElementById('edEndTime').value)||duration;
+  document.getElementById('startTime').value = trimStart;
+  document.getElementById('endTime').value = trimEnd;
+}
+
+function applyAndConvert() {
+  syncTrimToConvert();
+  showTab('convert');
+  convert();
+}
+
+async function convert() {
+  if (!inputFile) { showStatus('⚠️ Selecciona un archivo de video primero.', false); return; }
+  if (!outputFolder) { showStatus('⚠️ Selecciona una carpeta de salida.', false); return; }
+  const startTime = trimStart || 0;
+  const endTime = trimEnd > 0 && trimEnd < duration ? trimEnd : 0;
+  const volume = parseFloat(document.getElementById('volume').value);
+  const baseName = inputFile.split('\\').pop().split('/').pop().replace(/\.[^/.]+$/, '');
+  const outputPath = `${outputFolder}\\${baseName}_converted.${format}`;
+  const totalDur = endTime > 0 ? endTime - startTime : duration - startTime;
+  document.getElementById('btnConvert').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('status').style.display = 'none';
+  window.api.onProgress((secs) => {
+    const elapsed = secs - startTime;
+    const pct = Math.min(100, (elapsed/totalDur)*100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent = `Convirtiendo... ${Math.round(pct)}%`;
+  });
+  const result = await window.api.convert({ inputPath: inputFile, outputPath, format, startTime, endTime, volume });
+  document.getElementById('btnConvert').disabled = false;
+  document.getElementById('progressBar').style.width = '100%';
+  if (result.success) {
+    document.getElementById('progressText').textContent = '✅ ¡Conversión completada!';
+    showStatus(`✅ Guardado en: ${outputPath}`, true);
+  } else {
+    showStatus('❌ Error al convertir.', false);
+    document.getElementById('progressWrap').style.display = 'none';
+  }
+}
+
+function showStatus(msg, ok) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+}
+
+window.addEventListener('resize', () => { if (waveData.length) drawWave(); });
+</script>
+</body>
+</html>
